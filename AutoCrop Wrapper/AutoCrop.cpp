@@ -5,10 +5,10 @@
 #include <fstream>
 
 // Gdi+ headers
-#include <objidl.h>
+/*#include <objidl.h>
 #include <gdiplus.h>
 using namespace Gdiplus;
-#pragma comment (lib,"Gdiplus.lib")
+#pragma comment (lib,"Gdiplus.lib")*/
 
 // returns: 0=file not exist or fail to read, 1=success, 2=fail to auto crop, 3=fail to save file, 4=fail to load DLL
 AUTOCROP_API short AutoCrop(const WCHAR* pwstr)
@@ -27,15 +27,14 @@ AUTOCROP_API short AutoCrop(const WCHAR* pwstr)
 	// First we get a BITMAPINFOHEADER
 	BITMAPINFOHEADER bitmapInfoHeader;
 	unsigned char *bitmapData;
-	bitmapData = LoadBitmapFile(wstrSourceFile.c_str(), &bitmapInfoHeader, true);
+	bitmapData = LoadBitmapFile(wstrSourceFile.c_str(), &bitmapInfoHeader);
 	if (bitmapData == nullptr)
 		return 0;
-	free(bitmapData);
 
 	// Because LoadBitmapFile() seems not very correct, we only use its header.
 	// We will get the data using GDI+
 	// Initialize GDI+.
-	GdiplusStartupInput gdiplusStartupInput;
+	/*GdiplusStartupInput gdiplusStartupInput;
 	ULONG_PTR gdiplusToken;
 	GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
@@ -47,15 +46,16 @@ AUTOCROP_API short AutoCrop(const WCHAR* pwstr)
 	// Take out its raw RGB data.
 	BitmapData pbitmapData;
 	bmp->LockBits(&Rect(0, 0, bmp->GetWidth(), bmp->GetHeight()), ImageLockModeWrite, PixelFormat24bppRGB, &pbitmapData);
-	int dataSize = bitmapInfoHeader.biSizeImage;
+	int dataSize = bitmapInfoHeader.biSizeImage;*/
 
 	// Make a XBitmap object for input.
 	XBitmap	bmpImage = XBitmap::XBitmap();
-	bmpImage.CreateImage(bitmapInfoHeader.biWidth, bitmapInfoHeader.biHeight, 24, (unsigned char *)pbitmapData.Scan0, dataSize);
-	bmp->UnlockBits(&pbitmapData);
+	bmpImage.CreateImage(bitmapInfoHeader.biWidth, bitmapInfoHeader.biHeight, 24, bitmapData, bitmapInfoHeader.biSizeImage);
+	//bmp->UnlockBits(&pbitmapData);
+	free(bitmapData);
 
 	// un-init GDI+
-	GdiplusShutdown(gdiplusToken);
+	//GdiplusShutdown(gdiplusToken);
 
 	// Do auto chop
 	int nDeskew = 1;
@@ -128,16 +128,22 @@ unsigned char *LoadBitmapFile(const wchar_t *filename, BITMAPINFOHEADER *bitmapI
 	//read the bitmap info header
 	fread(bitmapInfoHeader, sizeof(BITMAPINFOHEADER), 1, filePtr);
 
+	//check if 24-bit bmp
+	if (bitmapInfoHeader->biBitCount != 24)
+	{
+		std::cout << "Unsupported BMP format.";
+		fclose(filePtr);
+		return NULL;
+	}
+
 	//move file point to the begging of bitmap data
 	fseek(filePtr, bitmapFileHeader.bfOffBits, SEEK_SET);
 
 	//allocate enough memory for the bitmap image data
 	int wBitBerPixel = 24;
 	int padding_out = (4 - (bitmapInfoHeader->biWidth * sizeof(RGBTRIPLE)) % 4) % 4;
-	// Change size and image size
+	// Change size and image size = ([RGB] * width + padding) * height
 	bitmapInfoHeader->biSizeImage = ((sizeof(RGBTRIPLE) * bitmapInfoHeader->biWidth) + padding_out) * abs(bitmapInfoHeader->biHeight);
-	DWORD dwBytesPerLine = (bitmapInfoHeader->biWidth * wBitBerPixel / 8 + 3) / 4 * 4;
-	unsigned long imageSize = dwBytesPerLine * bitmapInfoHeader->biHeight;
 	bitmapImage = (unsigned char*)malloc(bitmapInfoHeader->biSizeImage);
 
 	//verify memory allocation
@@ -161,12 +167,12 @@ unsigned char *LoadBitmapFile(const wchar_t *filename, BITMAPINFOHEADER *bitmapI
 	//swap the r and b values to get RGB (bitmap is BGR)
 	if (bSwapRG)
 	{
-		for (imageIdx = 0;imageIdx < bitmapInfoHeader->biSizeImage;imageIdx += 3) // fixed semicolon
+		/*for (imageIdx = 0;imageIdx < bitmapInfoHeader->biSizeImage;imageIdx += 3) // fixed semicolon
 		{
 			tempRGB = bitmapImage[imageIdx];
 			bitmapImage[imageIdx] = bitmapImage[imageIdx + 2];
 			bitmapImage[imageIdx + 2] = tempRGB;
-		}
+		}*/
 	}
 
 	//close file and return bitmap iamge data
